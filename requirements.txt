@@ -1,0 +1,4 @@
+# Requirements for Music Playlist Manager
+# Only Django is required (no external packages)
+django>=5.0.0
+

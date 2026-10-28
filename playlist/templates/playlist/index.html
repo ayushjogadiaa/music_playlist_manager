@@ -1,0 +1,219 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Spotify CDLL - Music Playlist Manager</title>
+  <link rel="stylesheet" href="{% static 'playlist/style.css' %}">
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="logo-area">
+        <div class="spotify-logo-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.495 17.306c-.215.353-.674.464-1.026.249-2.812-1.718-6.352-2.107-10.523-1.155-.403.092-.806-.16-.898-.563-.092-.403.16-.806.563-.898 4.568-1.044 8.49-.606 11.635 1.341.352.215.464.674.249 1.026zm1.467-3.262c-.271.442-.85.582-1.292.311-3.22-1.979-8.127-2.552-11.935-1.396-.499.151-1.027-.134-1.178-.633-.151-.499.134-1.027.633-1.178 4.357-1.323 9.771-.682 13.461 1.587.442.271.582.85.311 1.292zm.126-3.41c-3.86-2.292-10.229-2.503-13.916-1.383-.593.18-1.224-.16-1.404-.753-.18-.593.16-1.224.753-1.404 4.243-1.288 11.277-1.038 15.727 1.603.533.316.708 1.011.392 1.544-.316.533-1.011.708-1.544.392z"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Music Playlist Manager</h1>
+          <p class="subtitle">Circular Doubly Linked List &bull; Continuous Ring Navigation</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge-tag">O(1) Next / Prev</span>
+        <span class="badge-tag">No Array Shifting</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Global Alert / Notification Toast -->
+  <div id="alert-container" class="alert-container" style="display: none;">
+    <div id="alert-box" class="alert-box">
+      <span id="alert-icon" class="alert-icon">⚠️</span>
+      <span id="alert-message" class="alert-message"></span>
+      <button id="alert-close" class="alert-close" onclick="dismissAlert()">&times;</button>
+    </div>
+  </div>
+
+  <!-- Main Content Layout -->
+  <main class="main-layout">
+    <!-- LEFT COLUMN: Now Playing, Bidirectional Context, Add Song to Playlist -->
+    <section class="column left-col">
+      <!-- Now Playing Card -->
+      <div class="card now-playing-card">
+        <div class="card-header">
+          <span class="card-title">Now Playing</span>
+          <!-- Dynamic Animated Equalizer / Status Badge -->
+          <div id="playback-badge" class="playback-badge paused">
+            <span class="eq-bar eq-bar-1"></span>
+            <span class="eq-bar eq-bar-2"></span>
+            <span class="eq-bar eq-bar-3"></span>
+            <span id="playback-status-text">Paused</span>
+          </div>
+        </div>
+
+        <div class="player-body">
+          <div class="album-art" id="album-art">
+            <svg class="music-note-icon" viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+            </svg>
+          </div>
+          <div class="track-details">
+            <h2 id="now-title" class="track-title">Loading playlist...</h2>
+            <p id="now-artist" class="track-artist">&mdash;</p>
+            <div class="track-meta">
+              <span>Track ID: <strong id="now-id">-</strong></span>
+              <span>Position: <strong id="now-pos">-</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thin Spotify Progress Bar (4px track in #4D4D4D with white fill turning green on hover) -->
+        <div class="progress-section">
+          <div class="progress-bar-bg" id="progress-container">
+            <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+          </div>
+          <div class="progress-time">
+            <span id="time-elapsed">00:00</span>
+            <span class="loop-indicator">CDLL Auto-Advance Active</span>
+            <span id="time-total">00:00</span>
+          </div>
+        </div>
+
+        <!-- Playback Controls: Pill Prev/Next, Circular Green Play/Pause -->
+        <div class="player-controls">
+          <button id="btn-prev" class="btn-pill" title="Previous Track (O(1) current = current.prev)" onclick="handlePrev()">
+            ⏮ Prev
+          </button>
+
+          <!-- Circular Green Play/Pause Button with Inline SVG Icons -->
+          <button id="btn-play" class="play-btn-circle" title="Play / Pause" aria-label="Play" onclick="togglePlay()">
+            <!-- SVG Play Icon (Triangle) -->
+            <svg class="icon-play" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <polygon points="7,4 20,12 7,20"></polygon>
+            </svg>
+            <!-- SVG Pause Icon (Double Bars) -->
+            <svg class="icon-pause" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+              <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+            </svg>
+          </button>
+
+          <button id="btn-next" class="btn-pill" title="Next Track (O(1) current = current.next)" onclick="handleNext()">
+            Next ⏭
+          </button>
+        </div>
+      </div>
+
+      <!-- Bidirectional Context Panels -->
+      <div class="context-grid">
+        <div class="card context-card">
+          <div class="card-header-sm">
+            <span>Previous Track (<code>current.prev</code>)</span>
+          </div>
+          <div id="prev-track-content" class="context-content">
+            <p class="empty-text">No previous track</p>
+          </div>
+        </div>
+
+        <div class="card context-card">
+          <div class="card-header-sm">
+            <span>Up Next (<code>current.next</code>)</span>
+          </div>
+          <div id="upcoming-track-content" class="context-content">
+            <p class="empty-text">No upcoming tracks</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Track Form Card (on Left Column) -->
+      <div class="card action-card">
+        <div class="card-header-sm">
+          <span>Add Song to Playlist</span>
+        </div>
+        <form id="add-track-form" onsubmit="handleAddTrack(event)" class="compact-form">
+          <div class="form-row">
+            <input type="text" id="add-title" placeholder="Song Title (e.g. Starboy)" required />
+          </div>
+          <div class="form-row">
+            <input type="text" id="add-artist" placeholder="Artist Name (e.g. The Weeknd)" required />
+          </div>
+          <div class="form-row-duo">
+            <input type="number" id="add-duration" placeholder="Duration (seconds)" min="1" required />
+            <input type="number" id="add-position" placeholder="Position (optional)" min="1" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-pill btn-primary">Add Track</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: Playlist Table & CDLL Ring Visualizer -->
+    <section class="column right-col">
+      <!-- Playlist Table -->
+      <div class="card table-card">
+        <div class="card-header">
+          <span class="card-title">Tracks (<span id="total-count">0</span>)</span>
+          <span class="table-tip">Drag & drop rows to reorder via CDLL</span>
+        </div>
+        <div class="table-container">
+          <table class="playlist-table" id="playlist-table">
+            <thead>
+              <tr>
+                <th width="40">#</th>
+                <th width="30"></th>
+                <th>Title</th>
+                <th>Artist</th>
+                <th>Duration</th>
+                <th width="120" style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+              <tr>
+                <td colspan="6" class="text-center empty-text">Loading tracks...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CDLL Circular Ring Visualizer (on Right Column) -->
+      <div class="card ring-card">
+        <div class="card-header">
+          <span class="card-title">CDLL Ring Visualizer</span>
+          <span class="ring-help">Click node to play &bull; Green arrow = Tail &rarr; Head</span>
+        </div>
+        <div class="ring-wrapper">
+          <svg id="ring-svg" viewBox="0 0 600 520" width="100%" height="100%"></svg>
+        </div>
+        <div class="ring-legend">
+          <span class="legend-item"><span class="legend-dot active"></span> Currently Playing</span>
+          <span class="legend-item"><span class="legend-dot head"></span> Head Node</span>
+          <span class="legend-item"><span class="legend-dot standard"></span> Linked Node</span>
+          <span class="legend-item"><span class="legend-line loop"></span> Tail-to-Head Wrap</span>
+        </div>
+      </div>
+
+      <!-- Hidden Container for Console & Move Track (Preserved for compatibility and API calls) -->
+      <div id="hidden-tools-container" style="display: none;">
+        <form id="move-track-form" onsubmit="handleMoveTrack(event)">
+          <input type="number" id="move-from" />
+          <input type="number" id="move-to" />
+          <button type="submit">Move</button>
+        </form>
+        <div id="console-output"></div>
+        <form id="console-form" onsubmit="handleConsoleSubmit(event)">
+          <input type="text" id="console-input" />
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script src="{% static 'playlist/app.js' %}"></script>
+</body>
+</html>
